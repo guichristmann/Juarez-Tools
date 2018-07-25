@@ -11,8 +11,6 @@
 #include "MotionStatus.h"
 #include <python2.7/Python.h>
 
-#define INI_FILE_PATH "/home/juarez/Darwin-tools/Data/config.ini"
-
 using namespace Robot;
 
 LinuxCM730 linux_cm730("/dev/ttyUSB0");
@@ -37,7 +35,7 @@ void sighandler(int sig)
 
 void action_play_motion(int motion_id);
 
-void initMotionManager(){
+void initMotionManager(char * ini_file_path){
     signal(SIGABRT, &sighandler);
     signal(SIGTERM, &sighandler);
     signal(SIGQUIT, &sighandler);
@@ -45,7 +43,7 @@ void initMotionManager(){
 
     change_current_dir();
 
-    minIni* ini = new minIni(INI_FILE_PATH);
+    minIni* ini = new minIni(ini_file_path); // ini_file_path should always be an absolute path
 
     if(MotionManager::GetInstance()->Initialize(&cm730) == false)
     {
@@ -53,13 +51,9 @@ void initMotionManager(){
         exit(1);
     }
 
-
     MotionManager::GetInstance()->AddModule((MotionModule*)Walking::GetInstance());
     MotionManager::GetInstance()->AddModule((MotionModule*)Action::GetInstance());
     MotionManager::GetInstance()->AddModule((MotionModule*)Head::GetInstance());
-
-    // Load configuration files
-    //Action::GetInstance()->LoadFile((char*)MOTION_FILE_PATH);
 
     LinuxMotionTimer *motion_timer = new LinuxMotionTimer(MotionManager::GetInstance());
     motion_timer->Start();
@@ -73,6 +67,16 @@ void initMotionManager(){
     action_play_motion(1); // maybe this should be removed later
     printf("Motion Manager initialized...\n");
 
+}
+
+void motion_load_ini_settings(char * ini_file_path){
+    minIni * ini = new minIni(ini_file_path);
+    MotionManager::GetInstance()->LoadINISettings(ini);
+}
+
+void walk_load_ini_settings(char * ini_file_path){
+    minIni * ini = new minIni(ini_file_path);
+    Walking::GetInstance()->LoadINISettings(ini);
 }
 
 void action_play_motion(int motion_id){
@@ -100,6 +104,8 @@ void walk_start(){
 }
 
 bool walk_is_running(){
+    // This function has a strange behavior, if this is called during a loop it throws
+    // an overflow error after some time. I'm not sure why right now
     return Walking::GetInstance()->IsRunning();
 }
 
@@ -202,9 +208,42 @@ void joint_disable_torque(int id){
 
 // PYTHON WRAPPING
 
-static PyObject * initMotionManager_wrapper(PyObject * self)
+static PyObject * initMotionManager_wrapper(PyObject * self, PyObject * args)
 {
-    initMotionManager();
+    char * ini_file_path;
+
+    if (!PyArg_ParseTuple(args, "s", &ini_file_path)){
+        printf("Failed to parse arugment.\n");
+        return NULL;
+    }
+
+    initMotionManager(ini_file_path);
+    Py_RETURN_NONE;
+}
+
+static PyObject * motion_load_ini_settings_wrapper(PyObject * self, PyObject * args)
+{
+    char * ini_file_path;
+
+    if (!PyArg_ParseTuple(args, "s", &ini_file_path)){
+        printf("Failed to parse arugment.\n");
+        return NULL;
+    }
+
+    motion_load_ini_settings(ini_file_path);
+    Py_RETURN_NONE;
+}
+
+static PyObject * walk_load_ini_settings_wrapper(PyObject * self, PyObject * args)
+{
+    char * ini_file_path;
+
+    if (!PyArg_ParseTuple(args, "s", &ini_file_path)){
+        printf("Failed to parse arugment.\n");
+        return NULL;
+    }
+
+    walk_load_ini_settings(ini_file_path);
     Py_RETURN_NONE;
 }
 
@@ -384,9 +423,10 @@ static PyObject * walk_print_params_wrapper(PyObject * self){
     Py_RETURN_NONE;
 }
 
-
 static PyMethodDef darwin_motions_methods[] = {
-    { "initMotionManager", (PyCFunction) initMotionManager_wrapper, METH_NOARGS, "Initialize Darwin Framework and Motion Manager."},
+    { "initMotionManager", (PyCFunction) initMotionManager_wrapper, METH_VARARGS, "Initialize Darwin Framework and Motion Manager."},
+    { "motionLoadINI", (PyCFunction) motion_load_ini_settings_wrapper, METH_VARARGS, "Load a new INI file for Motion Manager"},
+    { "walkLoadINI", (PyCFunction) walk_load_ini_settings_wrapper, METH_VARARGS, "Load a new INI file for Walking Manager"},
     { "playMotion", (PyCFunction) action_play_motion_wrapper, METH_VARARGS, "Play a recorded motion from the Action Editor."},
     { "walkStart", (PyCFunction) walk_start_wrapper, METH_NOARGS, "Start walking."},
     { "walkStop", (PyCFunction) walk_stop_wrapper, METH_NOARGS, "Stop walking."},
