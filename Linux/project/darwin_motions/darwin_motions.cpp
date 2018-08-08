@@ -148,6 +148,10 @@ void walk_set_Z_offset(double Z){
     Walking::GetInstance()->Z_OFFSET = Z;
 }
 
+void walk_set_Hip_Pitch_offset(double hip_pitch_offset){
+    Walking::GetInstance()->HIP_PITCH_OFFSET = hip_pitch_offset;
+}
+
 void walk_set_period_time(double ptime){
     Walking::GetInstance()->PERIOD_TIME = ptime;
 }
@@ -204,6 +208,10 @@ void joint_disable_torque(int id){
     cm730.WriteByte(id, 0x18, 0, &error);
     if (error != 0)
         fprintf(stderr, "Couldn't write to motor %d\n", id);
+}
+
+int get_button(){
+    return MotionStatus::BUTTON;
 }
 
 // PYTHON WRAPPING
@@ -328,6 +336,17 @@ static PyObject * walk_set_Z_offset_wrapper(PyObject * self, PyObject * args){
     Py_RETURN_NONE;
 }
 
+static PyObject * walk_set_Hip_Pitch_offset_wrapper(PyObject * self, PyObject * args){
+    double hip_pitch_offset;
+
+    if (!PyArg_ParseTuple(args, "d", &hip_pitch_offset))
+        return NULL;
+
+    walk_set_Hip_Pitch_offset(hip_pitch_offset);
+
+    Py_RETURN_NONE;
+}
+
 static PyObject * walk_set_period_time_wrapper(PyObject * self, PyObject * args){
     double ptime;
 
@@ -423,11 +442,20 @@ static PyObject * walk_print_params_wrapper(PyObject * self){
     Py_RETURN_NONE;
 }
 
+static PyObject * get_button_wrapper(PyObject * self){
+    int button;
+
+    button = get_button();
+
+    return Py_BuildValue("i", button);
+}
+
 static PyMethodDef darwin_motions_methods[] = {
     { "initMotionManager", (PyCFunction) initMotionManager_wrapper, METH_VARARGS, "Initialize Darwin Framework and Motion Manager."},
     { "motionLoadINI", (PyCFunction) motion_load_ini_settings_wrapper, METH_VARARGS, "Load a new INI file for Motion Manager"},
     { "walkLoadINI", (PyCFunction) walk_load_ini_settings_wrapper, METH_VARARGS, "Load a new INI file for Walking Manager"},
     { "playMotion", (PyCFunction) action_play_motion_wrapper, METH_VARARGS, "Play a recorded motion from the Action Editor."},
+    { "getButton", (PyCFunction) get_button_wrapper, METH_NOARGS, "Get button press states."},
     { "walkStart", (PyCFunction) walk_start_wrapper, METH_NOARGS, "Start walking."},
     { "walkStop", (PyCFunction) walk_stop_wrapper, METH_NOARGS, "Stop walking."},
     { "walkIsRunning", (PyCFunction) walk_is_running_wrapper, METH_NOARGS, "Return status of walking."},
@@ -435,6 +463,7 @@ static PyMethodDef darwin_motions_methods[] = {
     { "walkSetXOffset", (PyCFunction) walk_set_X_offset_wrapper, METH_VARARGS, "Set X Offset parameter."},
     { "walkSetYOffset", (PyCFunction) walk_set_Y_offset_wrapper, METH_VARARGS, "Set Y Offset parameter."},
     { "walkSetZOffset", (PyCFunction) walk_set_Z_offset_wrapper, METH_VARARGS, "Set Z Offset parameter."},
+    { "walkSetHipPitchOffset", (PyCFunction) walk_set_Hip_Pitch_offset, METH_VARARGS, "Set Hip Pitch Offset parameter."},
     { "walkSetPeriodTime", (PyCFunction) walk_set_period_time_wrapper, METH_VARARGS, "Set Period Time Offset parameter."},
     { "walkPrintParams", (PyCFunction) walk_print_params_wrapper, METH_NOARGS, "Print Walking Parameters"},
     { "jointRead", (PyCFunction) joint_read_wrapper, METH_VARARGS, "Read current position of joint ID." },
